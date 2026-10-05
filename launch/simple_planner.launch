@@ -1,0 +1,60 @@
+<launch>
+
+  <!--
+    Current localisation output.
+    Change to /localization/inc_ukf later if you rename the UKF output topic.
+  -->
+  <arg name="pose_topic" default="/update_pose"/>
+  <arg name="cmd_vel_topic" default="/cmd_vel"/>
+
+  <node pkg="sara_simple_planner"
+        type="simple-planner.py"
+        name="simple_planner"
+        output="screen">
+
+    <rosparam command="load"
+              file="$(find sara_simple_planner)/config/waypoints.yaml"/>
+
+    <param name="pose_topic" value="$(arg pose_topic)"/>
+    <param name="cmd_vel_topic" value="$(arg cmd_vel_topic)"/>
+
+    <!-- Experimental route -->
+    <param name="loops" value="5"/>
+
+    <!-- Safety: false means the chair never moves just by launching the node. -->
+    <param name="auto_start" value="false"/>
+
+    <!-- Set true during manually measured ground-truth experiments. -->
+    <param name="manual_checkpoint" value="false"/>
+    <param name="dwell_time" value="2.0"/>
+
+    <!-- PD controller -->
+    <param name="kp_linear" value="0.45"/>
+    <param name="kd_linear" value="0.08"/>
+    <param name="kp_angular" value="1.30"/>
+    <param name="kd_angular" value="0.10"/>
+
+    <param name="position_tolerance" value="0.10"/>
+    <param name="heading_tolerance" value="0.10"/>
+
+    <param name="max_linear_velocity" value="0.25"/>
+    <param name="max_angular_velocity" value="0.45"/>
+
+    <!-- If heading error is larger than this, rotate before advancing. -->
+    <param name="rotate_in_place_threshold" value="0.70"/>
+
+    <param name="control_hz" value="20.0"/>
+    <param name="pose_timeout" value="0.50"/>
+
+    <param name="checkpoint_topic"
+           value="/simple_planner/checkpoint_reached"/>
+
+    <param name="target_topic"
+           value="/simple_planner/target_pose"/>
+
+    <param name="log_path"
+           value="/tmp/simple_planner_events.csv"/>
+
+  </node>
+
+</launch>
