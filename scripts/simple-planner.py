@@ -177,7 +177,7 @@ class SimplePlanner:
         self.pose = msg
         self.last_pose_rx_time = rospy.Time.now()
 
-        if self.auto_start and not self.running and self.state == self.WAITING:
+        if not self.running and self.state == self.WAITING:
             self.start_motion()
 
     def start_callback(self, _req):
