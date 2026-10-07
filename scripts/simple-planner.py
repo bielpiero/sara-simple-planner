@@ -33,7 +33,7 @@ class SimplePlanner:
 
     def __init__(self):
         # Topics
-        self.pose_topic = rospy.get_param("~pose_topic", "/update_pose")
+        self.pose_topic = rospy.get_param("~pose_topic", "/pose")
         self.cmd_vel_topic = rospy.get_param("~cmd_vel_topic", "/cmd_vel")
         self.checkpoint_topic = rospy.get_param(
             "~checkpoint_topic", "/simple_planner/checkpoint_reached"
