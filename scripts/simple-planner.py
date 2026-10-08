@@ -23,17 +23,29 @@ def clamp(value, low, high):
     return max(low, min(high, value))
 
 
+def move_towards(current, target, max_delta):
+    """Rate-limit a command without overshooting the requested target."""
+    if target > current:
+        return min(current + max_delta, target)
+    if target < current:
+        return max(current - max_delta, target)
+    return target
+
+
 class SimplePlanner:
     WAITING = "WAITING"
     GO_TO_POSITION = "GO_TO_POSITION"
-    ALIGN_HEADING = "ALIGN_HEADING"
     CHECKPOINT = "CHECKPOINT"
     DONE = "DONE"
     STOPPED = "STOPPED"
 
     def __init__(self):
+        # ------------------------------------------------------------
         # Topics
-        self.pose_topic = rospy.get_param("~pose_topic", "/pose")
+        # ------------------------------------------------------------
+        # Raw wheel odometry is intentionally used as planner feedback so
+        # trajectory generation does not depend on any estimator under test.
+        self.pose_topic = rospy.get_param("~pose_topic", "/pose/raw")
         self.cmd_vel_topic = rospy.get_param("~cmd_vel_topic", "/cmd_vel")
         self.checkpoint_topic = rospy.get_param(
             "~checkpoint_topic", "/simple_planner/checkpoint_reached"
@@ -42,14 +54,16 @@ class SimplePlanner:
             "~target_topic", "/simple_planner/target_pose"
         )
 
+        # ------------------------------------------------------------
         # Controller
-        self.kp_linear = rospy.get_param("~kp_linear", 0.45)
-        self.kd_linear = rospy.get_param("~kd_linear", 0.08)
-        self.kp_angular = rospy.get_param("~kp_angular", 1.30)
-        self.kd_angular = rospy.get_param("~kd_angular", 0.10)
+        # ------------------------------------------------------------
+        # Pure proportional controller. Derivative action is intentionally
+        # disabled; command ramps are used instead to avoid abrupt starts.
+        self.kp_linear = rospy.get_param("~kp_linear", 0.60)
+        self.kp_angular = rospy.get_param("~kp_angular", 1.50)
 
-        self.position_tolerance = rospy.get_param("~position_tolerance", 0.10)
-        self.heading_tolerance = rospy.get_param("~heading_tolerance", 0.10)
+        # Waypoint acceptance is positional only. No final theta is imposed.
+        self.position_tolerance = rospy.get_param("~position_tolerance", 0.03)
 
         self.max_linear_velocity = rospy.get_param(
             "~max_linear_velocity", 0.25
@@ -58,30 +72,52 @@ class SimplePlanner:
             "~max_angular_velocity", 0.45
         )
 
-        # If the target is far away from the current heading, rotate first.
+        # Avoid stalling close to a waypoint because of drivetrain dead-zone.
+        self.min_linear_velocity = rospy.get_param(
+            "~min_linear_velocity", 0.04
+        )
+
+        # Command slew-rate limits. They soften starts without introducing a
+        # derivative term into the feedback controller.
+        self.max_linear_acceleration = rospy.get_param(
+            "~max_linear_acceleration", 0.20
+        )
+        self.max_angular_acceleration = rospy.get_param(
+            "~max_angular_acceleration", 0.60
+        )
+
+        # If the robot is too far from the bearing to the current target,
+        # translation is stopped and the wheelchair rotates in place.
         self.rotate_in_place_threshold = rospy.get_param(
-            "~rotate_in_place_threshold", 0.70
+            "~rotate_in_place_threshold", 0.35
         )
 
         self.control_hz = rospy.get_param("~control_hz", 20.0)
         self.pose_timeout = rospy.get_param("~pose_timeout", 0.50)
 
+        # ------------------------------------------------------------
         # Experiment
-        self.loops = int(rospy.get_param("~loops", 5))
+        # ------------------------------------------------------------
+        # Five experimental repetitions should be run independently. Set a
+        # different run_id for each execution if desired.
+        self.run_id = int(rospy.get_param("~run_id", 1))
+
         self.dwell_time = rospy.get_param("~dwell_time", 2.0)
         self.manual_checkpoint = rospy.get_param("~manual_checkpoint", False)
-        self.auto_start = rospy.get_param("~auto_start", False)
 
-        # CSV event log
-        self.log_path = rospy.get_param(
-            "~log_path", "/tmp/simple_planner_events.csv"
-        )
+        # Default square trajectory:
+        # START=(0,0) -> P1=(3,0) -> P2=(3,3.5)
+        # -> P3=(0,3.5) -> HOME=(0,0)
+        default_waypoints = [
+            {"name": "P1", "marker_id": -1, "x": 3.0, "y": 0.0},
+            {"name": "P2", "marker_id": -1, "x": 3.0, "y": 3.5},
+            {"name": "P3", "marker_id": -1, "x": 0.0, "y": 3.5},
+            {"name": "HOME", "marker_id": -1, "x": 0.0, "y": 0.0},
+        ]
 
-        raw_waypoints = rospy.get_param("~waypoints", [])
-        if len(raw_waypoints) < 4:
-            raise rospy.ROSException(
-                "At least four waypoints are required in ~waypoints"
-            )
+        raw_waypoints = rospy.get_param("~waypoints", default_waypoints)
+        if len(raw_waypoints) < 1:
+            raise rospy.ROSException("At least one waypoint is required")
 
         self.waypoints = []
         for i, wp in enumerate(raw_waypoints):
@@ -91,30 +127,35 @@ class SimplePlanner:
                     "marker_id": int(wp.get("marker_id", -1)),
                     "x": float(wp["x"]),
                     "y": float(wp["y"]),
-                    "theta": float(wp.get("theta", 0.0)),
                 }
             )
 
+        # CSV event log
+        self.log_path = rospy.get_param(
+            "~log_path", "/tmp/simple_planner_events.csv"
+        )
+
+        # ------------------------------------------------------------
         # Runtime state
+        # ------------------------------------------------------------
         self.pose = None
         self.last_pose_rx_time = None
 
         self.state = self.WAITING
         self.running = False
-
-        # Initial target is P1 (home).
         self.target_index = 0
-        self.current_loop = 0
-        self.home_reached = False
-
-        self.prev_distance_error = None
-        self.prev_heading_error = None
-        self.prev_control_time = None
 
         self.checkpoint_start_time = None
         self.waiting_manual_continue = False
 
+        # Last published command, used by slew-rate limiting.
+        self.last_linear_cmd = 0.0
+        self.last_angular_cmd = 0.0
+        self.last_control_time = None
+
+        # ------------------------------------------------------------
         # ROS interfaces
+        # ------------------------------------------------------------
         self.cmd_pub = rospy.Publisher(
             self.cmd_vel_topic, Twist, queue_size=1
         )
@@ -145,7 +186,6 @@ class SimplePlanner:
         )
 
         self.prepare_log()
-
         rospy.on_shutdown(self.shutdown)
 
         rospy.loginfo("sara_simple_planner ready")
@@ -154,20 +194,26 @@ class SimplePlanner:
         rospy.loginfo(
             "Route: %s",
             " -> ".join(
-                "{}(ArUco {})".format(w["name"], w["marker_id"])
+                "{}({:.2f},{:.2f})".format(
+                    w["name"], w["x"], w["y"]
+                )
                 for w in self.waypoints
             ),
         )
         rospy.loginfo(
-            "Experimental loops: %d, manual checkpoint: %s",
-            self.loops,
-            str(self.manual_checkpoint),
+            "Position tolerance: %.3f m | rotate threshold: %.3f rad",
+            self.position_tolerance,
+            self.rotate_in_place_threshold,
         )
-
-        if self.auto_start:
-            rospy.logwarn(
-                "auto_start=true: motion will begin as soon as a valid pose is received"
-            )
+        rospy.loginfo(
+            "Controller: Kp_lin=%.3f Kp_ang=%.3f | "
+            "v=[%.3f, %.3f] m/s | w_max=%.3f rad/s",
+            self.kp_linear,
+            self.kp_angular,
+            self.min_linear_velocity,
+            self.max_linear_velocity,
+            self.max_angular_velocity,
+        )
 
     # ------------------------------------------------------------
     # ROS callbacks / services
@@ -177,6 +223,7 @@ class SimplePlanner:
         self.pose = msg
         self.last_pose_rx_time = rospy.Time.now()
 
+        # Start once the first valid pose has been received.
         if not self.running and self.state == self.WAITING:
             self.start_motion()
 
@@ -189,10 +236,11 @@ class SimplePlanner:
 
         if self.running:
             return TriggerResponse(
-                success=False, message="Planner is already running"
+                success=False,
+                message="Planner is already running",
             )
 
-        if self.state == self.DONE:
+        if self.state in (self.DONE, self.STOPPED):
             self.reset_experiment()
 
         self.start_motion()
@@ -207,11 +255,12 @@ class SimplePlanner:
     def stop_callback(self, _req):
         self.running = False
         self.state = self.STOPPED
-        self.publish_zero()
+        self.publish_zero(reset_history=True)
         self.log_event("STOPPED")
 
         return TriggerResponse(
-            success=True, message="Planner stopped"
+            success=True,
+            message="Planner stopped",
         )
 
     def continue_callback(self, _req):
@@ -235,21 +284,25 @@ class SimplePlanner:
 
     def reset_experiment(self):
         self.target_index = 0
-        self.current_loop = 0
-        self.home_reached = False
         self.waiting_manual_continue = False
         self.checkpoint_start_time = None
         self.state = self.WAITING
-        self.reset_pd()
+        self.reset_controller()
 
     def start_motion(self):
         self.running = True
         self.state = self.GO_TO_POSITION
-        self.reset_pd()
+        self.reset_controller()
         self.publish_target()
         self.log_event("START")
 
-    def control_callback(self, event):
+        rospy.loginfo(
+            "Starting run %d. First target: %s",
+            self.run_id,
+            self.waypoints[self.target_index]["name"],
+        )
+
+    def control_callback(self, _event):
         if not self.running:
             self.publish_zero()
             return
@@ -271,13 +324,11 @@ class SimplePlanner:
                 "Pose feedback is stale (%.3f s). Stopping command.",
                 pose_age,
             )
-            self.publish_zero()
+            self.publish_zero(reset_history=True)
             return
 
         if self.state == self.GO_TO_POSITION:
             self.control_position(now)
-        elif self.state == self.ALIGN_HEADING:
-            self.control_heading(now)
         elif self.state == self.CHECKPOINT:
             self.control_checkpoint(now)
         elif self.state in (self.DONE, self.STOPPED, self.WAITING):
@@ -290,10 +341,17 @@ class SimplePlanner:
         dy = target["y"] - self.pose.y
         distance = math.hypot(dx, dy)
 
+        # Position is the only waypoint acceptance criterion. The wheelchair
+        # orientation at arrival is intentionally unconstrained.
         if distance <= self.position_tolerance:
-            self.publish_zero()
-            self.state = self.ALIGN_HEADING
-            self.reset_pd()
+            self.publish_zero(reset_history=True)
+
+            # The last waypoint is HOME. Once reached, the run is complete.
+            if self.target_index == len(self.waypoints) - 1:
+                self.log_event("HOME_REACHED")
+                self.finish_experiment()
+            else:
+                self.enter_checkpoint()
             return
 
         desired_heading = math.atan2(dy, dx)
@@ -301,117 +359,75 @@ class SimplePlanner:
 
         dt = self.controller_dt(now)
 
-        d_distance = 0.0
-        d_heading = 0.0
-
-        if self.prev_distance_error is not None and dt > 0.0:
-            d_distance = (
-                distance - self.prev_distance_error
-            ) / dt
-
-        if self.prev_heading_error is not None and dt > 0.0:
-            d_heading = wrap_angle(
-                heading_error - self.prev_heading_error
-            ) / dt
-
-        linear = (
-            self.kp_linear * distance
-            + self.kd_linear * d_distance
+        angular_target = clamp(
+            self.kp_angular * heading_error,
+            -self.max_angular_velocity,
+            self.max_angular_velocity,
         )
 
-        angular = (
-            self.kp_angular * heading_error
-            + self.kd_angular * d_heading
+        # Angular command is ramped to avoid violent starts in rotation.
+        angular = move_towards(
+            self.last_angular_cmd,
+            angular_target,
+            self.max_angular_acceleration * dt,
         )
 
-        # Do not advance while the robot is pointing far away from the path.
         if abs(heading_error) >= self.rotate_in_place_threshold:
+            # Re-orient first. Translation is immediately stopped when the
+            # angular error becomes excessive.
             linear = 0.0
         else:
-            # Smoothly reduce forward speed when not perfectly aligned.
-            linear *= max(0.0, math.cos(heading_error))
+            # Advance toward the point. A minimum forward command avoids
+            # stalling in the drivetrain dead-zone near the target.
+            linear_target = self.kp_linear * distance
+            linear_target = clamp(
+                linear_target,
+                self.min_linear_velocity,
+                self.max_linear_velocity,
+            )
 
-        linear = clamp(
-            linear, 0.0, self.max_linear_velocity
-        )
-
-        angular = clamp(
-            angular,
-            -self.max_angular_velocity,
-            self.max_angular_velocity,
-        )
+            linear = move_towards(
+                self.last_linear_cmd,
+                linear_target,
+                self.max_linear_acceleration * dt,
+            )
 
         self.publish_cmd(linear, angular)
-
-        self.prev_distance_error = distance
-        self.prev_heading_error = heading_error
-
-    def control_heading(self, now):
-        target = self.waypoints[self.target_index]
-
-        heading_error = wrap_angle(
-            target["theta"] - self.pose.theta
-        )
-
-        if abs(heading_error) <= self.heading_tolerance:
-            self.publish_zero()
-            self.enter_checkpoint()
-            return
-
-        dt = self.controller_dt(now)
-
-        d_heading = 0.0
-        if self.prev_heading_error is not None and dt > 0.0:
-            d_heading = wrap_angle(
-                heading_error - self.prev_heading_error
-            ) / dt
-
-        angular = (
-            self.kp_angular * heading_error
-            + self.kd_angular * d_heading
-        )
-
-        angular = clamp(
-            angular,
-            -self.max_angular_velocity,
-            self.max_angular_velocity,
-        )
-
-        self.publish_cmd(0.0, angular)
-        self.prev_heading_error = heading_error
 
     def enter_checkpoint(self):
         self.state = self.CHECKPOINT
         self.checkpoint_start_time = rospy.Time.now()
         self.waiting_manual_continue = self.manual_checkpoint
-        self.publish_zero()
+        self.publish_zero(reset_history=True)
 
         target = self.waypoints[self.target_index]
 
         event = (
-            "loop={loop},waypoint={wp},marker_id={marker},"
-            "ref_x={x:.8f},ref_y={y:.8f},ref_theta={theta:.8f},"
-            "est_x={ex:.8f},est_y={ey:.8f},est_theta={eth:.8f}"
+            "run={run},waypoint={wp},marker_id={marker},"
+            "ref_x={x:.8f},ref_y={y:.8f},"
+            "pose_x={px:.8f},pose_y={py:.8f},pose_theta={pth:.8f}"
         ).format(
-            loop=self.current_loop,
+            run=self.run_id,
             wp=target["name"],
             marker=target["marker_id"],
             x=target["x"],
             y=target["y"],
-            theta=target["theta"],
-            ex=self.pose.x,
-            ey=self.pose.y,
-            eth=self.pose.theta,
+            px=self.pose.x,
+            py=self.pose.y,
+            pth=self.pose.theta,
         )
 
         self.checkpoint_pub.publish(String(data=event))
         self.log_event("CHECKPOINT")
 
         rospy.loginfo(
-            "Checkpoint %s (ArUco %d) reached | loop=%d",
+            "Checkpoint %s reached | run=%d | "
+            "position=(%.3f, %.3f) | arrival theta=%.3f rad",
             target["name"],
-            target["marker_id"],
-            self.current_loop,
+            self.run_id,
+            self.pose.x,
+            self.pose.y,
+            self.pose.theta,
         )
 
         if self.manual_checkpoint:
@@ -436,76 +452,30 @@ class SimplePlanner:
 
     def advance_after_checkpoint(self):
         self.checkpoint_start_time = None
-        self.reset_pd()
+        self.reset_controller()
 
-        # P1 is the home position. Reaching it initially only arms the route.
-        if not self.home_reached:
-            if self.target_index != 0:
-                rospy.logerr("Internal planner error: home is not P1")
-                self.running = False
-                self.publish_zero()
-                return
-
-            self.home_reached = True
-            self.current_loop = 1
-            self.target_index = 1
-            self.state = self.GO_TO_POSITION
-            self.publish_target()
-
-            rospy.loginfo(
-                "Home reached. Starting loop %d/%d",
-                self.current_loop,
-                self.loops,
-            )
+        if self.target_index >= len(self.waypoints) - 1:
+            self.finish_experiment()
             return
 
-        # Normal polygon traversal: P2 -> P3 -> P4 -> P1
-        if self.target_index < len(self.waypoints) - 1:
-            self.target_index += 1
-            self.state = self.GO_TO_POSITION
-            self.publish_target()
-            return
+        self.target_index += 1
+        self.state = self.GO_TO_POSITION
+        self.publish_target()
 
-        # P4 reached: close the polygon by returning to P1.
-        if self.target_index == len(self.waypoints) - 1:
-            self.target_index = 0
-            self.state = self.GO_TO_POSITION
-            self.publish_target()
-            return
-
-        # P1 reached after P4 -> one complete loop.
-        if self.target_index == 0:
-            rospy.loginfo(
-                "Loop %d/%d completed",
-                self.current_loop,
-                self.loops,
-            )
-            self.log_event("LOOP_COMPLETED")
-
-            if self.current_loop >= self.loops:
-                self.finish_experiment()
-                return
-
-            self.current_loop += 1
-            self.target_index = 1
-            self.state = self.GO_TO_POSITION
-            self.publish_target()
-
-            rospy.loginfo(
-                "Starting loop %d/%d",
-                self.current_loop,
-                self.loops,
-            )
+        rospy.loginfo(
+            "Next target: %s",
+            self.waypoints[self.target_index]["name"],
+        )
 
     def finish_experiment(self):
         self.running = False
         self.state = self.DONE
-        self.publish_zero()
+        self.publish_zero(reset_history=True)
         self.log_event("DONE")
 
         rospy.loginfo(
-            "Experiment completed: %d polygon loops",
-            self.loops,
+            "Run %d completed. HOME reached.",
+            self.run_id,
         )
 
     # ------------------------------------------------------------
@@ -513,20 +483,20 @@ class SimplePlanner:
     # ------------------------------------------------------------
 
     def controller_dt(self, now):
-        if self.prev_control_time is None:
+        if self.last_control_time is None:
             dt = 1.0 / self.control_hz
         else:
-            dt = (now - self.prev_control_time).to_sec()
+            dt = (now - self.last_control_time).to_sec()
             if dt <= 0.0:
                 dt = 1.0 / self.control_hz
 
-        self.prev_control_time = now
+        self.last_control_time = now
         return dt
 
-    def reset_pd(self):
-        self.prev_distance_error = None
-        self.prev_heading_error = None
-        self.prev_control_time = None
+    def reset_controller(self):
+        self.last_linear_cmd = 0.0
+        self.last_angular_cmd = 0.0
+        self.last_control_time = None
 
     def publish_cmd(self, linear, angular):
         msg = Twist()
@@ -534,8 +504,19 @@ class SimplePlanner:
         msg.angular.z = angular
         self.cmd_pub.publish(msg)
 
-    def publish_zero(self):
-        self.publish_cmd(0.0, 0.0)
+        self.last_linear_cmd = linear
+        self.last_angular_cmd = angular
+
+    def publish_zero(self, reset_history=False):
+        msg = Twist()
+        msg.linear.x = 0.0
+        msg.angular.z = 0.0
+        self.cmd_pub.publish(msg)
+
+        if reset_history:
+            self.last_linear_cmd = 0.0
+            self.last_angular_cmd = 0.0
+            self.last_control_time = None
 
     def publish_target(self):
         target = self.waypoints[self.target_index]
@@ -543,17 +524,19 @@ class SimplePlanner:
         msg = Pose2D()
         msg.x = target["x"]
         msg.y = target["y"]
-        msg.theta = target["theta"]
+
+        # Theta has no waypoint-control meaning in this planner. Pose2D is
+        # retained only for compatibility with the existing target topic.
+        msg.theta = 0.0
 
         self.target_pub.publish(msg)
 
         rospy.loginfo(
-            "New target: %s | ArUco %d | x=%.3f y=%.3f theta=%.3f",
+            "New target: %s | ArUco %d | x=%.3f y=%.3f",
             target["name"],
             target["marker_id"],
             target["x"],
             target["y"],
-            target["theta"],
         )
 
     def prepare_log(self):
@@ -572,21 +555,25 @@ class SimplePlanner:
                     "timestamp",
                     "event",
                     "state",
-                    "loop",
+                    "run_id",
                     "waypoint",
                     "marker_id",
                     "ref_x",
                     "ref_y",
-                    "ref_theta",
-                    "est_x",
-                    "est_y",
-                    "est_theta",
+                    "pose_x",
+                    "pose_y",
+                    "pose_theta",
                 ]
             )
             self.log_file.flush()
 
     def log_event(self, event):
-        target = self.waypoints[self.target_index]
+        if not self.waypoints:
+            return
+
+        target = self.waypoints[
+            min(self.target_index, len(self.waypoints) - 1)
+        ]
 
         px = py = ptheta = float("nan")
         if self.pose is not None:
@@ -599,12 +586,11 @@ class SimplePlanner:
                 rospy.Time.now().to_sec(),
                 event,
                 self.state,
-                self.current_loop,
+                self.run_id,
                 target["name"],
                 target["marker_id"],
                 target["x"],
                 target["y"],
-                target["theta"],
                 px,
                 py,
                 ptheta,
@@ -613,7 +599,7 @@ class SimplePlanner:
         self.log_file.flush()
 
     def shutdown(self):
-        self.publish_zero()
+        self.publish_zero(reset_history=True)
 
         try:
             self.log_event("SHUTDOWN")
