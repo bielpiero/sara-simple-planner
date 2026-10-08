@@ -95,16 +95,6 @@ class SimplePlanner:
                 }
             )
 
-        self.waypoints.append(
-            {
-                "name": "start_point",
-                "marker_id": -1,
-                "x": 0.0,
-                "y": 0.0,
-                "theta": -1.57,
-            }
-        )
-
         # Runtime state
         self.pose = None
         self.last_pose_rx_time = None
