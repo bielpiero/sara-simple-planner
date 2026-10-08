@@ -1,24 +1,19 @@
 waypoints:
 - name: P1
   marker_id: 3
-  x: 1.465
+  x: 3.0
   y: 0.0
-  theta: -0.010783317761480761
+  theta: 0.0
 - name: P2
   marker_id: 41
-  x: 2.88991715
-  y: -0.01536593
-  theta: 1.5863486233058588
+  x: 3.0
+  y: 3.5
+  theta: 0
 - name: P3
   marker_id: 25
-  x: 2.84855065
-  y: 2.64425188
-  theta: 3.0588283735917243
-- name: P4
-  marker_id: 19
-  x: 1.42842843
-  y: 2.76205638
-  theta: -1.5575563968307764
+  x: 0.0
+  y: 3.5
+  theta: 0.0
 - name: HOME
   marker_id: -1
   x: 0.0

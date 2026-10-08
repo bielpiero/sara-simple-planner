@@ -4,7 +4,7 @@
     Current localisation output.
     Change to /localization/inc_ukf later if you rename the UKF output topic.
   -->
-  <arg name="pose_topic" default="/pose/filtered/ukf/incremental"/>
+  <arg name="pose_topic" default="/pose/filtered/ekf/incremental"/>
   <arg name="cmd_vel_topic" default="/cmd_vel"/>
 
   <node pkg="sara_simple_planner"
@@ -29,10 +29,10 @@
     <param name="dwell_time" value="2.0"/>
 
     <!-- PD controller -->
-    <param name="kp_linear" value="0.45"/>
-    <param name="kd_linear" value="0.08"/>
+    <param name="kp_linear" value="0.75"/>
+    <param name="kd_linear" value="0.00"/>
     <param name="kp_angular" value="1.30"/>
-    <param name="kd_angular" value="0.10"/>
+    <param name="kd_angular" value="0.00"/>
 
     <param name="position_tolerance" value="0.10"/>
     <param name="heading_tolerance" value="0.10"/>
