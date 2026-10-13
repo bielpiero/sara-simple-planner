@@ -41,13 +41,14 @@
     <param name="max_linear_velocity" value="0.66"/>
     <param name="max_angular_velocity" value="1.10"/>
 
-    <param name="min_effective_linear_velocity" value="0.3"/>
+    <param name="min_effective_linear_velocity" value="0.4"/>
+    <param name="min_effective_angular_velocity" value="0.6"/>
 
     <param name="acceleration_distance" value="0.50"/>
-    <param name="deceleration_distance" value="0.50"/>
+    <param name="deceleration_distance" value="0.15"/>
 
     <!-- If heading error is larger than this, rotate before advancing. -->
-    <param name="rotate_in_place_threshold" value="0.3"/>
+    <param name="rotate_in_place_threshold" value="0.2"/>
 
     <param name="control_hz" value="20.0"/>
     <param name="pose_timeout" value="0.50"/>
