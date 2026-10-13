@@ -57,84 +57,64 @@ class SimplePlanner:
         # ------------------------------------------------------------
         # Controller
         # ------------------------------------------------------------
-        # Pure proportional controller. Derivative action is intentionally
-        # disabled. Smoothness is handled with command ramps and hysteresis.
-        self.kp_linear = rospy.get_param("~kp_linear", 0.40)
-        self.kp_angular = rospy.get_param("~kp_angular", 0.90)
+        # Discrete PD:
+        #   u(k) = Kp*e(k) + Kd*(e(k)-e(k-1))
+        #   Kd   = Kp*Td/dt
+        self.kp_linear = rospy.get_param("~kp_linear", 0.45)
+        self.td_linear = rospy.get_param("~td_linear", 0.08)
 
-        # Waypoint acceptance is positional only. No final theta is imposed.
-        self.position_tolerance = rospy.get_param("~position_tolerance", 0.03)
+        self.kp_angular = rospy.get_param("~kp_angular", 1.00)
+        self.td_angular = rospy.get_param("~td_angular", 0.06)
 
-        # Linear motion. The minimum must be set slightly above the smallest
-        # cmd_vel that actually moves the loaded wheelchair on the test floor.
-        self.min_linear_velocity = rospy.get_param(
-            "~min_linear_velocity", 0.10
+        self.derivative_limit_ratio = rospy.get_param(
+            "~derivative_limit_ratio", 0.80
         )
+
+        self.position_tolerance = rospy.get_param(
+            "~position_tolerance", 0.03
+        )
+
         self.max_linear_velocity = rospy.get_param(
             "~max_linear_velocity", 0.20
-        )
-
-        # Final approach: low but physically effective translational speed.
-        self.approach_distance = rospy.get_param(
-            "~approach_distance", 0.30
-        )
-        self.approach_velocity = rospy.get_param(
-            "~approach_velocity", 0.10
-        )
-
-        # Angular motion. min_angular_velocity is applied ONLY while rotating
-        # in place; small steering corrections while translating are not forced
-        # to this minimum, otherwise the wheelchair would zig-zag.
-        self.min_angular_velocity = rospy.get_param(
-            "~min_angular_velocity", 0.85
         )
         self.max_angular_velocity = rospy.get_param(
             "~max_angular_velocity", 1.00
         )
 
-        # Rotate-in-place hysteresis. Enter rotation with the larger threshold
-        # and resume translation only after the smaller threshold is reached.
-        self.rotate_in_place_threshold = rospy.get_param(
-            "~rotate_in_place_threshold", 0.30
+        self.acceleration_distance = rospy.get_param(
+            "~acceleration_distance", 0.50
         )
-        self.resume_motion_threshold = rospy.get_param(
-            "~resume_motion_threshold", 0.12
+        self.deceleration_distance = rospy.get_param(
+            "~deceleration_distance", 0.50
         )
 
-        # Slew-rate limits: gentle starts, somewhat stronger braking.
-        self.max_linear_acceleration = rospy.get_param(
-            "~max_linear_acceleration", 0.10
+        if self.acceleration_distance <= 0.0:
+            raise rospy.ROSException("acceleration_distance must be > 0")
+        if self.deceleration_distance <= 0.0:
+            raise rospy.ROSException("deceleration_distance must be > 0")
+
+        self.linear_acceleration = (
+            self.max_linear_velocity * self.max_linear_velocity
+            / (2.0 * self.acceleration_distance)
         )
-        self.max_linear_deceleration = rospy.get_param(
-            "~max_linear_deceleration", 0.25
+        self.linear_deceleration = (
+            self.max_linear_velocity * self.max_linear_velocity
+            / (2.0 * self.deceleration_distance)
         )
-        self.max_angular_acceleration = rospy.get_param(
-            "~max_angular_acceleration", 0.30
+
+        self.angular_acceleration = rospy.get_param(
+            "~angular_acceleration", 0.40
         )
-        self.max_angular_deceleration = rospy.get_param(
-            "~max_angular_deceleration", 0.60
+        self.angular_deceleration = rospy.get_param(
+            "~angular_deceleration", 0.80
+        )
+
+        self.rotate_in_place_threshold = rospy.get_param(
+            "~rotate_in_place_threshold", 0.30
         )
 
         self.control_hz = rospy.get_param("~control_hz", 20.0)
         self.pose_timeout = rospy.get_param("~pose_timeout", 0.50)
-
-        if self.min_linear_velocity > self.max_linear_velocity:
-            raise rospy.ROSException(
-                "min_linear_velocity cannot exceed max_linear_velocity"
-            )
-        if self.approach_velocity > self.max_linear_velocity:
-            raise rospy.ROSException(
-                "approach_velocity cannot exceed max_linear_velocity"
-            )
-        if self.min_angular_velocity > self.max_angular_velocity:
-            raise rospy.ROSException(
-                "min_angular_velocity cannot exceed max_angular_velocity"
-            )
-        if self.resume_motion_threshold >= self.rotate_in_place_threshold:
-            raise rospy.ROSException(
-                "resume_motion_threshold must be smaller than "
-                "rotate_in_place_threshold"
-            )
 
         # ------------------------------------------------------------
         # Experiment
@@ -189,11 +169,14 @@ class SimplePlanner:
         self.checkpoint_start_time = None
         self.waiting_manual_continue = False
 
-        # Last published command, used by slew-rate limiting.
+        # Last published command, used by acceleration/deceleration ramps.
         self.last_linear_cmd = 0.0
         self.last_angular_cmd = 0.0
         self.last_control_time = None
-        self.rotating_in_place = False
+
+        # Previous controller errors for the discrete derivative term.
+        self.prev_distance_error = None
+        self.prev_heading_error = None
 
         # ------------------------------------------------------------
         # ROS interfaces
@@ -248,23 +231,21 @@ class SimplePlanner:
             self.rotate_in_place_threshold,
         )
         rospy.loginfo(
-            "Controller: Kp_lin=%.3f Kp_ang=%.3f | "
-            "v_min=%.3f v_app=%.3f v_max=%.3f m/s | "
-            "w_min(rot)=%.3f w_max=%.3f rad/s",
+            "PD controller: Kp_lin=%.3f Td_lin=%.3f s | "
+            "Kp_ang=%.3f Td_ang=%.3f s",
             self.kp_linear,
+            self.td_linear,
             self.kp_angular,
-            self.min_linear_velocity,
-            self.approach_velocity,
-            self.max_linear_velocity,
-            self.min_angular_velocity,
-            self.max_angular_velocity,
+            self.td_angular,
         )
         rospy.loginfo(
-            "Rotation hysteresis: enter=%.3f rad, resume=%.3f rad | "
-            "approach distance=%.3f m",
-            self.rotate_in_place_threshold,
-            self.resume_motion_threshold,
-            self.approach_distance,
+            "Linear profile: v_max=%.3f m/s | accel_dist=%.3f m "
+            "(a=%.4f m/s^2) | decel_dist=%.3f m (a=%.4f m/s^2)",
+            self.max_linear_velocity,
+            self.acceleration_distance,
+            self.linear_acceleration,
+            self.deceleration_distance,
+            self.linear_deceleration,
         )
 
     # ------------------------------------------------------------
@@ -391,13 +372,13 @@ class SimplePlanner:
 
         dx = target["x"] - self.pose.x
         dy = target["y"] - self.pose.y
-        distance = math.hypot(dx, dy)
+        distance_error = math.hypot(dx, dy)
 
-        # Position is the only waypoint acceptance criterion.
-        if distance <= self.position_tolerance:
+        # The only normal full-stop condition during navigation is reaching
+        # the positional tolerance.
+        if distance_error <= self.position_tolerance:
             self.publish_zero(reset_history=True)
 
-            # The last waypoint is HOME. Once reached, the run is complete.
             if self.target_index == len(self.waypoints) - 1:
                 self.log_event("HOME_REACHED")
                 self.finish_experiment()
@@ -407,77 +388,81 @@ class SimplePlanner:
 
         desired_heading = math.atan2(dy, dx)
         heading_error = wrap_angle(desired_heading - self.pose.theta)
-        abs_heading_error = abs(heading_error)
+
         dt = self.controller_dt(now)
 
-        # Hysteresis: rotate first when the heading error is large, and do not
-        # resume translation until the wheelchair is clearly aligned again.
-        if self.rotating_in_place:
-            if abs_heading_error <= self.resume_motion_threshold:
-                self.rotating_in_place = False
-        elif abs_heading_error >= self.rotate_in_place_threshold:
-            self.rotating_in_place = True
+        linear_pd = self.pd_command(
+            distance_error,
+            self.prev_distance_error,
+            self.kp_linear,
+            self.td_linear,
+            dt,
+        )
 
-        # Angular command.
-        angular_target = self.kp_angular * heading_error
+        angular_pd = self.pd_command(
+            heading_error,
+            self.prev_heading_error,
+            self.kp_angular,
+            self.td_angular,
+            dt,
+        )
 
-        if self.rotating_in_place and abs(angular_target) > 0.0:
-            # Compensate the real drivetrain dead-zone only during rotation
-            # in place. Do not force this minimum for small steering corrections
-            # during forward motion.
-            angular_target = math.copysign(
-                max(abs(angular_target), self.min_angular_velocity),
-                angular_target,
-            )
+        self.prev_distance_error = distance_error
+        self.prev_heading_error = heading_error
 
         angular_target = clamp(
-            angular_target,
+            angular_pd,
             -self.max_angular_velocity,
             self.max_angular_velocity,
         )
 
         angular_rate = (
-            self.max_angular_acceleration
+            self.angular_acceleration
             if abs(angular_target) >= abs(self.last_angular_cmd)
-            else self.max_angular_deceleration
+            else self.angular_deceleration
         )
+
         angular = move_towards(
             self.last_angular_cmd,
             angular_target,
             angular_rate * dt,
         )
 
-        # Linear command.
-        if self.rotating_in_place:
+        # Braking envelope:
+        # v <= sqrt(2*a_dec*(distance - tolerance))
+        # This reaches zero exactly at the waypoint acceptance boundary.
+        remaining_to_stop = max(
+            distance_error - self.position_tolerance,
+            0.0,
+        )
+
+        braking_limit = math.sqrt(
+            2.0 * self.linear_deceleration * remaining_to_stop
+        )
+        braking_limit = min(
+            braking_limit,
+            self.max_linear_velocity,
+        )
+
+        if abs(heading_error) >= self.rotate_in_place_threshold:
             linear_target = 0.0
-        elif distance <= self.approach_distance:
-            # Low-speed final approach, but still above the effective dead-zone.
-            linear_target = max(
-                self.approach_velocity,
-                self.min_linear_velocity,
+        else:
+            linear_target = clamp(
+                linear_pd,
+                0.0,
+                self.max_linear_velocity,
             )
             linear_target = min(
                 linear_target,
-                self.max_linear_velocity,
+                braking_limit,
             )
-        else:
-            linear_target = clamp(
-                self.kp_linear * distance,
-                self.min_linear_velocity,
-                self.max_linear_velocity,
-            )
-
-        if not self.rotating_in_place:
-            # Reduce forward speed as the bearing error grows.
-            linear_target *= max(0.0, math.cos(heading_error))
-            if 0.0 < linear_target < self.min_linear_velocity:
-                linear_target = self.min_linear_velocity
 
         linear_rate = (
-            self.max_linear_acceleration
+            self.linear_acceleration
             if linear_target >= self.last_linear_cmd
-            else self.max_linear_deceleration
+            else self.linear_deceleration
         )
+
         linear = move_towards(
             self.last_linear_cmd,
             linear_target,
@@ -574,6 +559,28 @@ class SimplePlanner:
     # Helpers
     # ------------------------------------------------------------
 
+    def pd_command(self, error, previous_error, kp, td, dt):
+        """
+        Discrete PD:
+            u(k) = Kp*e(k) + Kd*(e(k)-e(k-1))
+            Kd   = Kp*Td/dt
+
+        The D term is limited so it damps the response without cancelling
+        the P term while a non-zero error remains.
+        """
+        p_term = kp * error
+
+        if previous_error is None or dt <= 1e-9 or td <= 0.0:
+            return p_term
+
+        kd = kp * td / dt
+        d_term = kd * (error - previous_error)
+
+        d_limit = self.derivative_limit_ratio * abs(p_term)
+        d_term = clamp(d_term, -d_limit, d_limit)
+
+        return p_term + d_term
+
     def controller_dt(self, now):
         if self.last_control_time is None:
             dt = 1.0 / self.control_hz
@@ -589,7 +596,8 @@ class SimplePlanner:
         self.last_linear_cmd = 0.0
         self.last_angular_cmd = 0.0
         self.last_control_time = None
-        self.rotating_in_place = False
+        self.prev_distance_error = None
+        self.prev_heading_error = None
 
     def publish_cmd(self, linear, angular):
         msg = Twist()

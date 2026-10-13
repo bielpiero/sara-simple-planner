@@ -29,19 +29,20 @@
     <param name="dwell_time" value="2.0"/>
 
     <!-- PD controller -->
-    <param name="kp_linear" value="0.35"/>
-    <param name="kd_linear" value="0.00"/>
-    <param name="kp_angular" value="0.90"/>
-    <param name="kd_angular" value="0.00"/>
+    <param name="kp_linear" value="0.45"/>
+    <param name="td_linear" value="0.08"/>
+    <param name="kp_angular" value="1.00"/>
+    <param name="td_angular" value="0.06"/>
 
     <param name="position_tolerance" value="0.03"/>
     <param name="approach_distance" value="0.30"/>
     <param name="heading_tolerance" value="0.08"/>
 
     <param name="max_linear_velocity" value="0.66"/>
-    <param name="min_linear_velocity" value="0.30"/>-
-    <param name="min_angular_velocity" value="0.90"/>
     <param name="max_angular_velocity" value="1.10"/>
+
+    <param name="acceleration_distance" value="0.50"/>
+    <param name="deceleration_distance" value="0.50"/>
 
     <!-- If heading error is larger than this, rotate before advancing. -->
     <param name="rotate_in_place_threshold" value="0.3"/>
