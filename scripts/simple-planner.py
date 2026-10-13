@@ -66,15 +66,15 @@ class SimplePlanner:
         self.position_tolerance = rospy.get_param("~position_tolerance", 0.03)
 
         self.max_linear_velocity = rospy.get_param(
-            "~max_linear_velocity", 0.25
+            "~max_linear_velocity", 0.75
         )
         self.max_angular_velocity = rospy.get_param(
-            "~max_angular_velocity", 0.45
+            "~max_angular_velocity", 1.5
         )
 
         # Avoid stalling close to a waypoint because of drivetrain dead-zone.
         self.min_linear_velocity = rospy.get_param(
-            "~min_linear_velocity", 0.04
+            "~min_linear_velocity", 0.75
         )
 
         # Command slew-rate limits. They soften starts without introducing a
@@ -89,7 +89,7 @@ class SimplePlanner:
         # If the robot is too far from the bearing to the current target,
         # translation is stopped and the wheelchair rotates in place.
         self.rotate_in_place_threshold = rospy.get_param(
-            "~rotate_in_place_threshold", 0.35
+            "~rotate_in_place_threshold", 0.55
         )
 
         self.control_hz = rospy.get_param("~control_hz", 20.0)
