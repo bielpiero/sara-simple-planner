@@ -81,6 +81,10 @@ class SimplePlanner:
             "~max_angular_velocity", 1.00
         )
 
+        self.min_effective_linear_velocity = rospy.get_param(
+            "~min_effective_linear_velocity", 0.3
+        )
+
         self.acceleration_distance = rospy.get_param(
             "~acceleration_distance", 0.50
         )
@@ -456,6 +460,12 @@ class SimplePlanner:
                 linear_target,
                 braking_limit,
             )
+
+            if distance_error > self.position_tolerance and 0.0 < linear_target < self.min_effective_linear_velocity:
+                linear_target = self.min_effective_linear_velocity
+
+
+
 
         linear_rate = (
             self.linear_acceleration
