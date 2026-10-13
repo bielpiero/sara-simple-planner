@@ -1,10 +1,6 @@
 <launch>
 
-  <!--
-    Current localisation output.
-    Change to /localization/inc_ukf later if you rename the UKF output topic.
-  -->
-  <arg name="pose_topic" default="/pose/filtered/ukf/incremental"/>
+  <arg name="pose_topic" default="/pose/raw"/>
   <arg name="cmd_vel_topic" default="/cmd_vel"/>
 
   <node pkg="sara_simple_planner"
@@ -12,47 +8,41 @@
         name="simple_planner"
         output="screen">
 
+    <!-- Waypoints -->
     <rosparam command="load"
               file="$(find sara_simple_planner)/config/waypoints.yaml"/>
 
+    <!-- Topics -->
     <param name="pose_topic" value="$(arg pose_topic)"/>
     <param name="cmd_vel_topic" value="$(arg cmd_vel_topic)"/>
 
-    <!-- Experimental route -->
-    <param name="loops" value="5"/>
-
-    <!-- Safety: false means the chair never moves just by launching the node. -->
-    <param name="auto_start" value="false"/>
-
-    <!-- Set true during manually measured ground-truth experiments. -->
+    <!-- Experiment -->
     <param name="manual_checkpoint" value="false"/>
     <param name="dwell_time" value="2.0"/>
 
     <!-- PD controller -->
-    <param name="kp_linear" value="0.45"/>
-    <param name="td_linear" value="0.08"/>
+    <param name="kp_linear" value="0.50"/>
+    <param name="td_linear" value="0.04"/>
+
     <param name="kp_angular" value="1.00"/>
-    <param name="td_angular" value="0.06"/>
+    <param name="td_angular" value="0.05"/>
 
+    <!-- Tolerances -->
     <param name="position_tolerance" value="0.03"/>
-    <param name="approach_distance" value="0.30"/>
-    <param name="heading_tolerance" value="0.08"/>
+    <param name="heading_tolerance" value="0.12"/>
 
+    <!-- Physical velocity limits -->
+    <param name="min_linear_velocity" value="0.40"/>
     <param name="max_linear_velocity" value="0.66"/>
+
+    <param name="min_angular_velocity" value="0.60"/>
     <param name="max_angular_velocity" value="1.10"/>
 
-    <param name="min_effective_linear_velocity" value="0.4"/>
-    <param name="min_effective_angular_velocity" value="0.6"/>
-
-    <param name="acceleration_distance" value="0.50"/>
-    <param name="deceleration_distance" value="0.15"/>
-
-    <!-- If heading error is larger than this, rotate before advancing. -->
-    <param name="rotate_in_place_threshold" value="0.2"/>
-
+    <!-- Control -->
     <param name="control_hz" value="20.0"/>
     <param name="pose_timeout" value="0.50"/>
 
+    <!-- Logging / experiment topics -->
     <param name="checkpoint_topic"
            value="/simple_planner/checkpoint_reached"/>
 
