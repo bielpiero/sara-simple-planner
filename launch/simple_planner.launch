@@ -39,6 +39,7 @@
     <param name="heading_tolerance" value="0.08"/>
 
     <param name="max_linear_velocity" value="0.66"/>
+    <param name="min_linear_velocity" value="0.30"/>-
     <param name="min_angular_velocity" value="0.90"/>
     <param name="max_angular_velocity" value="1.10"/>
 
