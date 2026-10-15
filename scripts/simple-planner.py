@@ -118,10 +118,10 @@ class SimplePlanner:
         # START=(0,0) -> P1=(3,0) -> P2=(3,3.5)
         # -> P3=(0,3.5) -> HOME=(0,0)
         default_waypoints = [
-            {"name": "P1", "marker_id": -1, "x": 3.0, "y": 0.0},
-            {"name": "P2", "marker_id": -1, "x": 3.0, "y": 3.5},
-            {"name": "P3", "marker_id": -1, "x": 0.0, "y": 3.5},
-            {"name": "HOME", "marker_id": -1, "x": 0.0, "y": 0.0},
+            {"name": "P1", "x": 3.0, "y": 0.0},
+            {"name": "P2", "x": 3.0, "y": 3.5},
+            {"name": "P3", "x": 0.0, "y": 3.5},
+            {"name": "HOME", "x": 0.0, "y": 0.0},
         ]
 
         raw_waypoints = rospy.get_param("~waypoints", default_waypoints)
@@ -133,7 +133,6 @@ class SimplePlanner:
             self.waypoints.append(
                 {
                     "name": str(wp.get("name", "P{}".format(i + 1))),
-                    "marker_id": int(wp.get("marker_id", -1)),
                     "x": float(wp["x"]),
                     "y": float(wp["y"]),
                 }
@@ -426,13 +425,12 @@ class SimplePlanner:
         target = self.waypoints[self.target_index]
 
         event = (
-            "run={run},waypoint={wp},marker_id={marker},"
+            "run={run},waypoint={wp},"
             "ref_x={x:.8f},ref_y={y:.8f},"
             "pose_x={px:.8f},pose_y={py:.8f},pose_theta={pth:.8f}"
         ).format(
             run=self.run_id,
             wp=target["name"],
-            marker=target["marker_id"],
             x=target["x"],
             y=target["y"],
             px=self.pose.x,
@@ -568,9 +566,8 @@ class SimplePlanner:
         self.target_pub.publish(msg)
 
         rospy.loginfo(
-            "New target: %s | ArUco %d | x=%.3f y=%.3f",
+            "New target: %s | x=%.3f y=%.3f",
             target["name"],
-            target["marker_id"],
             target["x"],
             target["y"],
         )
@@ -593,7 +590,6 @@ class SimplePlanner:
                     "state",
                     "run_id",
                     "waypoint",
-                    "marker_id",
                     "ref_x",
                     "ref_y",
                     "pose_x",
@@ -624,7 +620,6 @@ class SimplePlanner:
                 self.state,
                 self.run_id,
                 target["name"],
-                target["marker_id"],
                 target["x"],
                 target["y"],
                 px,

@@ -1,6 +1,6 @@
 <launch>
 
-  <arg name="pose_topic" default="/pose/raw"/>
+  <arg name="pose_topic" default="/pose/filtered/ukf/incremental"/>
   <arg name="cmd_vel_topic" default="/cmd_vel"/>
 
   <node pkg="sara_simple_planner"
@@ -21,22 +21,22 @@
     <param name="dwell_time" value="2.0"/>
 
     <!-- PD controller -->
-    <param name="kp_linear" value="0.50"/>
-    <param name="td_linear" value="0.04"/>
+    <param name="kp_linear" value="0.34"/>
+    <param name="td_linear" value="0.00"/>
 
-    <param name="kp_angular" value="1.00"/>
-    <param name="td_angular" value="0.05"/>
+    <param name="kp_angular" value="0.45"/>
+    <param name="td_angular" value="0.00"/>
 
     <!-- Tolerances -->
-    <param name="position_tolerance" value="0.03"/>
-    <param name="heading_tolerance" value="0.12"/>
+    <param name="position_tolerance" value="0.05"/>
+    <param name="heading_tolerance" value="0.08"/>
 
     <!-- Physical velocity limits -->
-    <param name="min_linear_velocity" value="0.40"/>
-    <param name="max_linear_velocity" value="0.66"/>
+    <param name="min_linear_velocity" value="0.35"/>
+    <param name="max_linear_velocity" value="0.50"/>
 
-    <param name="min_angular_velocity" value="0.60"/>
-    <param name="max_angular_velocity" value="1.10"/>
+    <param name="min_angular_velocity" value="0.75"/>
+    <param name="max_angular_velocity" value="0.90"/>
 
     <!-- Control -->
     <param name="control_hz" value="20.0"/>
