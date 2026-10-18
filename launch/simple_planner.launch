@@ -1,42 +1,51 @@
 <launch>
 
+  <!-- Select: rectangle | figure8 -->
+  <arg name="trajectory" default="rectangle"/>
+
+  <!-- Fixed estimator used only as trajectory-controller feedback -->
   <arg name="pose_topic" default="/pose/filtered/ukf/incremental"/>
   <arg name="cmd_vel_topic" default="/cmd_vel"/>
+  <arg name="run_id" default="1"/>
 
   <node pkg="sara_simple_planner"
         type="simple-planner.py"
         name="simple_planner"
         output="screen">
 
-    <!-- Waypoints -->
+    <!-- Trajectory -->
     <rosparam command="load"
-              file="$(find sara_simple_planner)/config/waypoints.yaml"/>
+              file="$(find sara_simple_planner)/config/$(arg trajectory).yaml"/>
 
     <!-- Topics -->
     <param name="pose_topic" value="$(arg pose_topic)"/>
     <param name="cmd_vel_topic" value="$(arg cmd_vel_topic)"/>
 
     <!-- Experiment -->
-    <param name="manual_checkpoint" value="false"/>
-    <param name="dwell_time" value="2.0"/>
+    <param name="run_id" value="$(arg run_id)"/>
 
-    <!-- PD controller -->
+    <!-- Distance PD -->
     <param name="kp_linear" value="0.34"/>
-    <param name="td_linear" value="0.00"/>
+    <param name="kd_linear" value="0.00"/>
 
+    <!-- Heading PD -->
     <param name="kp_angular" value="0.45"/>
-    <param name="td_angular" value="0.00"/>
+    <param name="kd_angular" value="0.00"/>
 
-    <!-- Tolerances -->
-    <param name="position_tolerance" value="0.05"/>
-    <param name="heading_tolerance" value="0.08"/>
+    <!-- State-machine thresholds -->
+    <param name="d_tolerance" value="0.05"/>
+    <param name="theta_tolerance" value="0.08"/>
+    <param name="theta_1" value="0.20"/>
 
-    <!-- Physical velocity limits -->
-    <param name="min_linear_velocity" value="0.35"/>
-    <param name="max_linear_velocity" value="0.50"/>
+    <!-- Command limits -->
+    <param name="min_linear_velocity" value="0.08"/>
+    <param name="max_linear_velocity" value="0.25"/>
+    <param name="min_angular_velocity" value="0.10"/>
+    <param name="max_angular_velocity" value="0.45"/>
 
-    <param name="min_angular_velocity" value="0.75"/>
-    <param name="max_angular_velocity" value="0.90"/>
+    <!-- Acceleration/deceleration ramps -->
+    <param name="linear_acceleration" value="0.10"/>
+    <param name="angular_acceleration" value="0.50"/>
 
     <!-- Control -->
     <param name="control_hz" value="20.0"/>
@@ -45,12 +54,13 @@
     <!-- Logging / experiment topics -->
     <param name="checkpoint_topic"
            value="/simple_planner/checkpoint_reached"/>
-
     <param name="target_topic"
            value="/simple_planner/target_pose"/>
 
     <param name="log_path"
-           value="/tmp/simple_planner_events.csv"/>
+           value="/tmp/simple_planner_events_$(arg trajectory).csv"/>
+    <param name="ground_truth_path"
+           value="/tmp/ground_truth_$(arg trajectory).csv"/>
 
   </node>
 

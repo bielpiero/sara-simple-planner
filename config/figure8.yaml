@@ -1,0 +1,18 @@
+waypoints:
+  - {name: "Q1",  x: 1.500, y: 1.750, checkpoint: false}
+  - {name: "Q2",  x: 2.036, y: 0.689, checkpoint: false}
+  - {name: "Q3",  x: 2.490, y: 0.250, checkpoint: true}
+  - {name: "Q4",  x: 2.793, y: 0.689, checkpoint: false}
+  - {name: "Q5",  x: 2.900, y: 1.750, checkpoint: true}
+  - {name: "Q6",  x: 2.793, y: 2.811, checkpoint: false}
+  - {name: "Q7",  x: 2.490, y: 3.250, checkpoint: true}
+  - {name: "Q8",  x: 2.036, y: 2.811, checkpoint: false}
+  - {name: "Q9",  x: 1.500, y: 1.750, checkpoint: true}
+  - {name: "Q10", x: 0.964, y: 0.689, checkpoint: false}
+  - {name: "Q11", x: 0.510, y: 0.250, checkpoint: true}
+  - {name: "Q12", x: 0.207, y: 0.689, checkpoint: false}
+  - {name: "Q13", x: 0.100, y: 1.750, checkpoint: true}
+  - {name: "Q14", x: 0.207, y: 2.811, checkpoint: false}
+  - {name: "Q15", x: 0.510, y: 3.250, checkpoint: true}
+  - {name: "Q16", x: 0.964, y: 2.811, checkpoint: false}
+  - {name: "Q17", x: 1.500, y: 1.750, checkpoint: true}

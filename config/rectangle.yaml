@@ -1,0 +1,5 @@
+waypoints:
+  - {name: "P1", x: 3.00, y: 0.00, checkpoint: true}
+  - {name: "P2", x: 3.00, y: 3.50, checkpoint: true}
+  - {name: "P3", x: 0.00, y: 3.50, checkpoint: true}
+  - {name: "P4", x: 0.00, y: 0.00, checkpoint: true}
