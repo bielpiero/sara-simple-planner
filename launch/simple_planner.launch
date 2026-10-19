@@ -13,45 +13,27 @@
         name="simple_planner"
         output="screen">
 
-    <!-- Trajectory -->
     <rosparam command="load"
               file="$(find sara_simple_planner)/config/$(arg trajectory).yaml"/>
 
-    <!-- Topics -->
     <param name="pose_topic" value="$(arg pose_topic)"/>
     <param name="cmd_vel_topic" value="$(arg cmd_vel_topic)"/>
-
-    <!-- Experiment -->
     <param name="run_id" value="$(arg run_id)"/>
 
-    <!-- Distance PD -->
-    <param name="kp_linear" value="0.34"/>
-    <param name="kd_linear" value="0.00"/>
-
-    <!-- Heading PD -->
-    <param name="kp_angular" value="0.45"/>
-    <param name="kd_angular" value="0.00"/>
-
-    <!-- State-machine thresholds -->
+    <!-- Waypoint tolerance + 3 deg / 7 deg angular hysteresis -->
     <param name="d_tolerance" value="0.05"/>
-    <param name="theta_tolerance" value="0.08"/>
-    <param name="theta_1" value="0.20"/>
+    <param name="theta_enter" value="0.0523598776"/>
+    <param name="theta_exit" value="0.1221730476"/>
 
-    <!-- Command limits -->
-    <param name="min_linear_velocity" value="0.08"/>
+    <!-- Only physical limits remain here. Fuzzy rules live in their classes. -->
     <param name="max_linear_velocity" value="0.25"/>
-    <param name="min_angular_velocity" value="0.10"/>
     <param name="max_angular_velocity" value="0.45"/>
+    <param name="linear_acceleration" value="0.12"/>
+    <param name="angular_acceleration" value="0.60"/>
 
-    <!-- Acceleration/deceleration ramps -->
-    <param name="linear_acceleration" value="0.10"/>
-    <param name="angular_acceleration" value="0.50"/>
-
-    <!-- Control -->
     <param name="control_hz" value="20.0"/>
     <param name="pose_timeout" value="0.50"/>
 
-    <!-- Logging / experiment topics -->
     <param name="checkpoint_topic"
            value="/simple_planner/checkpoint_reached"/>
     <param name="target_topic"
