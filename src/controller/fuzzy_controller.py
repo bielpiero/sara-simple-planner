@@ -17,10 +17,10 @@ class FuzzyController:
         self.distance_max = 4.0
 
         # Explicit physical output ranges.
-        self.linear_min = min_linear_speed
-        self.linear_max = max_linear_speed
-        self.angular_min = -max_angular_speed
-        self.angular_max = max_angular_speed
+        self.linear_min = -1.0
+        self.linear_max = 1.0
+        self.angular_min = -2.0
+        self.angular_max = 2.0
 
         self.engine = fl.Engine(
             name="SARAWaypointController",
@@ -30,10 +30,13 @@ class FuzzyController:
                     name="distanceError",
                     description="Euclidean distance to active waypoint [m]",
                     enabled=True,
-                    minimum=0.0,
-                    maximum=self.distance_max,
-                    lock_range=True,
+                    minimum=-math.inf,
+                    maximum=math.inf,
+                    lock_range=False,
                     terms=[
+                        fl.Triangle("NVeryFar", -math.inf, -0.75, -0.45),
+                        fl.Triangle("NFar", -0.75, -0.45, -0.150),
+                        fl.Triangle("NNear", -0.45, -0.150, -0.050),
                         fl.Trapezoid("Zero", -0.150, -0.050, 0.050, 0.150),
                         fl.Triangle("PNear", 0.05, 0.15, 0.45),
                         fl.Triangle("PFar", 0.15, 0.45, 0.75),
@@ -46,7 +49,7 @@ class FuzzyController:
                     enabled=True,
                     minimum=-math.pi,
                     maximum=math.pi,
-                    lock_range=True,
+                    lock_range=False,
                     terms=[
                         fl.Triangle("NVeryFar", -math.pi, -0.044, -0.035),
                         fl.Triangle("NFar", -0.044, -0.035, -0.026),
@@ -71,6 +74,9 @@ class FuzzyController:
                     default_value=0.0,
                     lock_previous=False,
                     terms=[
+                        fl.Triangle("FastBackwards", -0.80, -0.60, -0.40),
+                        fl.Triangle("Backwards", -0.60, -0.40, -0.20),
+                        fl.Triangle("MediumBackwards", -0.40, -0.20, 0.000),
                         fl.Triangle("Zero", -0.20, 0.000, 0.20),
                         fl.Triangle("MediumForward", 0.000, 0.20, 0.40),
                         fl.Triangle("Forward", 0.20, 0.40, 0.60),
@@ -110,28 +116,37 @@ class FuzzyController:
                     activation=fl.General(),
                     rules=[
                         fl.Rule.create("if distanceError is Zero then linearVelocity is Zero and angularVelocity is Zero"),
-                        fl.Rule.create("if angleError is NVeryFar then linearVelocity is Zero and angularVelocity is SlowRight"),
-                        fl.Rule.create("if angleError is PVeryFar then linearVelocity is Zero and angularVelocity is SlowLeft"),
-                        fl.Rule.create("if angleError is NFar and distanceError is PNear then linearVelocity is Zero and angularVelocity is VSlowRight"),
-                        fl.Rule.create("if angleError is NFar and distanceError is PFar then linearVelocity is MediumForward and angularVelocity is VSlowRight"),
-                        fl.Rule.create("if angleError is NFar and distanceError is PVeryFar then linearVelocity is MediumForward and angularVelocity is VSlowRight"),
-                        fl.Rule.create("if angleError is PFar and distanceError is PNear then linearVelocity is Zero and angularVelocity is VSlowLeft"),
-                        fl.Rule.create("if angleError is PFar and distanceError is PFar then linearVelocity is MediumForward and angularVelocity is VSlowLeft"),
-                        fl.Rule.create("if angleError is PFar and distanceError is PVeryFar then linearVelocity is MediumForward and angularVelocity is VSlowLeft"),
-                        fl.Rule.create("if angleError is NNear and distanceError is PNear then linearVelocity is MediumForward and angularVelocity is Zero"),
+                        
+                        fl.Rule.create("if angleError is NVeryFar then linearVelocity is Zero and angularVelocity is FastRight"),
+                        fl.Rule.create("if angleError is NFar then linearVelocity is Zero and angularVelocity is SlowRight"),
+                        fl.Rule.create("if angleError is PFar then linearVelocity is Zero and angularVelocity is SlowLeft"),
+                        fl.Rule.create("if angleError is PVeryFar then linearVelocity is Zero and angularVelocity is FastLeft"),
+                        
+                        fl.Rule.create("if angleError is NNear and distanceError is NVeryFar then linearVelocity is FastBackwards and angularVelocity is VSlowRight"),
+                        fl.Rule.create("if angleError is NNear and distanceError is NFar then linearVelocity is Backwards and angularVelocity is VSlowRight"),
+                        fl.Rule.create("if angleError is NNear and distanceError is NNear then linearVelocity is MediumBackwards and angularVelocity is VSlowRight"),
+                        fl.Rule.create("if angleError is NNear and distanceError is PNear then linearVelocity is MediumForward and angularVelocity is VSlowRight"),
                         fl.Rule.create("if angleError is NNear and distanceError is PFar then linearVelocity is Forward and angularVelocity is VSlowRight"),
                         fl.Rule.create("if angleError is NNear and distanceError is PVeryFar then linearVelocity is FastForward and angularVelocity is VSlowRight"),
-                        fl.Rule.create("if angleError is PNear and distanceError is PNear then linearVelocity is MediumForward and angularVelocity is Zero"),
+                        
+                        fl.Rule.create("if angleError is PNear and distanceError is NVeryFar then linearVelocity is FastBackwards and angularVelocity is VSlowLeft"),
+                        fl.Rule.create("if angleError is PNear and distanceError is NFar then linearVelocity is Backwards and angularVelocity is VSlowLeft"),
+                        fl.Rule.create("if angleError is PNear and distanceError is NNear then linearVelocity is MediumBackwards and angularVelocity is VSlowLeft"),
+                        fl.Rule.create("if angleError is PNear and distanceError is PNear then linearVelocity is MediumForward and angularVelocity is VSlowLeft"),
                         fl.Rule.create("if angleError is PNear and distanceError is PFar then linearVelocity is Forward and angularVelocity is VSlowLeft"),
                         fl.Rule.create("if angleError is PNear and distanceError is PVeryFar then linearVelocity is FastForward and angularVelocity is VSlowLeft"),
+                        
+                        fl.Rule.create("if angleError is Zero and distanceError is NVeryFar then linearVelocity is FastBackwards and angularVelocity is Zero"),
+                        fl.Rule.create("if angleError is Zero and distanceError is NFar then linearVelocity is Backwards and angularVelocity is Zero"),
+                        fl.Rule.create("if angleError is Zero and distanceError is NNear then linearVelocity is MediumBackwards and angularVelocity is Zero"),
                         fl.Rule.create("if angleError is Zero and distanceError is PNear then linearVelocity is MediumForward and angularVelocity is Zero"),
                         fl.Rule.create("if angleError is Zero and distanceError is PFar then linearVelocity is Forward and angularVelocity is Zero"),
                         fl.Rule.create("if angleError is Zero and distanceError is PVeryFar then linearVelocity is FastForward and angularVelocity is Zero"),
-                    ],
+],
                 )
             ],
         )
-
+        self.engine.rule_block("mamdani").load_rules(self.engine)
         self.last_distance_error = math.inf
         self.last_angle_error = 0.0
         self.last_desired_heading = 0.0
@@ -147,17 +162,46 @@ class FuzzyController:
         self.last_distance_error = distance_error
         self.last_angle_error = angle_error
         self.last_desired_heading = desired_heading
+        
+        print(f"distance_error: {distance_error}, heading_error: {angle_error}")
 
         # At the waypoint, heading is irrelevant: stop completely.
         if distance_error <= self.goal_tolerance:
             return 0.0, 0.0, True
-
-        self.engine.input_variable("distanceError").value = distance_error
-        self.engine.input_variable("angleError").value = angle_error
+        distanceError = self.engine.input_variable("distanceError")
+        angleError= self.engine.input_variable("angleError")
+        
+        distanceError.value = distance_error
+        angleError.value = angle_error
+        
+        print("================ DISTANCE MF ================")
+        
+        for term in distanceError.terms:
+            degree = term.membership(distance_error)
+            print(" {:12s} -> {:.4f}".format(term.name, float(degree)))
+        
+        print("================ ANGLE MF ================")
+        for term in angleError.terms:
+            degree = term.membership(angle_error)
+            print(" {:12s} -> {:.4f}".format(term.name, float(degree)))
+            
         self.engine.process()
-
-        linear = float(self.engine.output_variable("linearVelocity").value)
-        angular = float(self.engine.output_variable("angularVelocity").value)
+        
+        print(f"Fuzzy distance error: {distanceError.value}")
+        print(f"Fuzzy angle error: {angleError.value}")
+        
+        print("================ RULE BLOCK ================")
+        rule_block = self.engine.rule_block("mamdani").rules
+        for i, rule in enumerate(rule_block):
+            print(" R{:02d}: activation={} triggered={}".format(i, rule.activation_degree, rule.triggered))
+        
+        linVel = self.engine.output_variable("linearVelocity")
+        angVel = self.engine.output_variable("angularVelocity")
+        
+        print(f"Fuzzy Output Value Linear: {linVel.fuzzy_value()}")
+        print(f"Fuzzy Output Value Angular: {angVel.fuzzy_value()}")
+        linear = float(linVel.value)
+        angular = float(angVel.value)
 
         if not math.isfinite(linear):
             linear = 0.0
