@@ -34,10 +34,10 @@ class FuzzyController:
                     maximum=self.distance_max,
                     lock_range=True,
                     terms=[
-                        fl.Trapezoid("Zero", 0.0, 0.0, 0.05, 0.15),
+                        fl.Trapezoid("Zero", -0.150, -0.050, 0.050, 0.150),
                         fl.Triangle("PNear", 0.05, 0.15, 0.45),
                         fl.Triangle("PFar", 0.15, 0.45, 0.75),
-                        fl.Trapezoid("PVeryFar", 0.45, 0.75, self.distance_max, self.distance_max),
+                        fl.Triangle("PVeryFar", 0.45, 0.75, math.inf),
                     ],
                 ),
                 fl.InputVariable(
@@ -48,13 +48,13 @@ class FuzzyController:
                     maximum=math.pi,
                     lock_range=True,
                     terms=[
-                        fl.Trapezoid("NVeryFar", -math.pi, -math.pi, -0.175, -0.070),
-                        fl.Triangle("NFar", -0.175, -0.070, -0.026),
-                        fl.Triangle("NNear", -0.070, -0.016, 0.000),
+                        fl.Triangle("NVeryFar", -math.pi, -0.044, -0.035),
+                        fl.Triangle("NFar", -0.044, -0.035, -0.026),
+                        fl.Triangle("NNear", -0.035, -0.026, -0.017),
                         fl.Trapezoid("Zero", -0.026, -0.017, 0.017, 0.026),
-                        fl.Triangle("PNear", 0.000, 0.016, 0.070),
-                        fl.Triangle("PFar", 0.026, 0.070, 0.175),
-                        fl.Trapezoid("PVeryFar", 0.070, 0.175, math.pi, math.pi),
+                        fl.Triangle("PNear", 0.017, 0.026, 0.035),
+                        fl.Triangle("PFar", 0.026, 0.035, 0.044),
+                        fl.Triangle("PVeryFar", 0.035, 0.044, math.pi),
                     ],
                 ),
             ],
@@ -152,7 +152,7 @@ class FuzzyController:
         if distance_error <= self.goal_tolerance:
             return 0.0, 0.0, True
 
-        self.engine.input_variable("distanceError").value = min(distance_error, self.distance_max)
+        self.engine.input_variable("distanceError").value = distance_error
         self.engine.input_variable("angleError").value = angle_error
         self.engine.process()
 
