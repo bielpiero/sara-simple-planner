@@ -109,7 +109,7 @@ class SimplePlanner:
         except Exception as exc:
             raise rospy.ROSException(
                 "Could not initialise fuzzy controllers: {}. "
-                "Install pyfuzzylite with: python3 -m pip install pyfuzzylite==8.0.6"
+                "Install pyfuzzylite with: python3 -m pip install pyfuzzylite"
                 .format(exc)
             )
 
@@ -249,6 +249,7 @@ class SimplePlanner:
         self.controller.reset()
         self.publish_target()
         self.log_event("START")
+        self.state = StateMachine.TRACKING
         rospy.loginfo(
             "Starting run %d. First target: %s",
             self.run_id,
