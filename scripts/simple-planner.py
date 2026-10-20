@@ -24,7 +24,7 @@ from geometry_msgs.msg import Pose2D, Twist
 from std_msgs.msg import String
 from std_srvs.srv import Trigger, TriggerResponse
 
-from fuzzy_controller import FuzzyController
+from controller.fuzzy_controller import FuzzyController
 
 
 def wrap_angle(angle):
