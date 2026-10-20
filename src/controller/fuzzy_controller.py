@@ -9,7 +9,7 @@ def wrap_angle(angle):
 
 
 class FuzzyController:
-    def __init__(self, min_linear_speed = 0.25, max_linear_speed = 0.65, min_angular_speed = 0.85, max_angular_speed = 1.00, goal_tolerance = 0.05):
+    def __init__(self, goal_tolerance = 0.07):
         # ==============================================================
         # TUNING -- edit here, not in the launch file
         # ==============================================================
@@ -77,13 +77,10 @@ class FuzzyController:
                     default_value=0.0,
                     lock_previous=False,
                     terms=[
-                        fl.Triangle("FastBackwards", -0.80, -0.60, -0.40),
-                        fl.Triangle("Backwards", -0.60, -0.40, -0.20),
-                        fl.Triangle("MediumBackwards", -0.40, -0.20, 0.000),
-                        fl.Triangle("Zero", -0.20, 0.000, 0.20),
-                        fl.Triangle("MediumForward", 0.000, 0.20, 0.40),
-                        fl.Triangle("Forward", 0.20, 0.40, 0.60),
-                        fl.Triangle("FastForward", 0.40, 0.60, 0.80),
+                        fl.Triangle("Zero", 0.000, 0.000, 0.30),
+                        fl.Triangle("MediumForward", 0.220, 0.300, 0.380),
+                        fl.Triangle("Forward", 0.320, 0.450, 0.500),
+                        fl.Trapezoid("FastForward", 0.50, 0.60, 0.650, 0.650),
                     ],
                 ),
                 fl.OutputVariable(
@@ -119,50 +116,50 @@ class FuzzyController:
                     activation=fl.General(),
                     rules=[
                             # ==========================================================
-    # TARGET REACHED REGION
-    # ==========================================================
-    fl.Rule.create("if distanceError is Zero then linearVelocity is Zero and angularVelocity is Zero"),
+                            # TARGET REACHED REGION
+                            # ==========================================================
+                            fl.Rule.create("if distanceError is Zero then linearVelocity is Zero and angularVelocity is Zero"),
 
-    # ==========================================================
-    # VERY LARGE HEADING ERROR
-    # Rotate in place.
-    # ==========================================================
-    fl.Rule.create("if angleError is NVeryFar then linearVelociy is Zero and angularVelocity is FastRight"),
-    fl.Rule.create("if angleError is PVeryFar then linearVelocity is Zero and angularVelocity is FastLeft"),
+                            # ==========================================================
+                            # VERY LARGE HEADING ERROR
+                            # Rotate in place.
+                            # ==========================================================
+                            fl.Rule.create("if angleError is NVeryFar then linearVelocity is Zero and angularVelocity is FastRight"),
+                            fl.Rule.create("if angleError is PVeryFar then linearVelocity is Zero and angularVelocity is FastLeft"),
 
-    # ==========================================================
-    # MODERATE HEADING ERROR
-    # Far from target -> gentle arc.
-    # Near target -> correct heading without advancing.
-    # ==========================================================
-    fl.Rule.create("if angleError is NFar and distanceError is PNear then linearVelocity is Zero and angularVelocity is VSlowRight"),
-    fl.Rule.create("if angleError is NFar and distanceError is PFar then linearVelocity is MediumForward and angularVelocity is VSlowRight"),
-    fl.Rule.create("if angleError is NFar and distanceError is PVeryFar then linearVelocity is MediumForward and angularVelocity is VSlowRight"),
+                            # ==========================================================
+                            # MODERATE HEADING ERROR
+                            # Far from target -> gentle arc.
+                            # Near target -> correct heading without advancing.
+                            # ==========================================================
+                            fl.Rule.create("if angleError is NFar and distanceError is PNear then linearVelocity is Zero and angularVelocity is VSlowRight"),
+                            fl.Rule.create("if angleError is NFar and distanceError is PFar then linearVelocity is MediumForward and angularVelocity is VSlowRight"),
+                            fl.Rule.create("if angleError is NFar and distanceError is PVeryFar then linearVelocity is MediumForward and angularVelocity is VSlowRight"),
 
-    fl.Rule.create("if angleError is PFar and distanceError is PNear then linearVelocity is Zero and angularVelocity is VSlowLeft"),
-    fl.Rule.create("if angleError is PFar and distanceError is PFar then linearVelocity is MediumForward and angularVelocity is VSlowLeft"),
-    fl.Rule.create("if angleError is PFar and distanceError is PVeryFar then linearVelocity is MediumForward and angularVelocity is VSlowLeft"),
+                            fl.Rule.create("if angleError is PFar and distanceError is PNear then linearVelocity is Zero and angularVelocity is VSlowLeft"),
+                            fl.Rule.create("if angleError is PFar and distanceError is PFar then linearVelocity is MediumForward and angularVelocity is VSlowLeft"),
+                            fl.Rule.create("if angleError is PFar and distanceError is PVeryFar then linearVelocity is MediumForward and angularVelocity is VSlowLeft"),
 
-    # ==========================================================
-    # SMALL HEADING ERROR
-    # Keep moving and make gentle corrections.
-    # Close to waypoint, ignore tiny angular corrections.
-    # ==========================================================
-    fl.Rule.create("if angleError is NNear and distanceError is PNear then linearVelocity is MediumForward and angularVelocity is Zero"),
-    fl.Rule.create("if angleError is NNear and distanceError is PFar then linearVelocity is Forward and angularVelocity is VSlowRight"),
-    fl.Rule.create("if angleError is NNear and distanceError is PVeryFar then linearVelocity is FastForward and angularVelocity is VSlowRight"),
+                            # ==========================================================
+                            # SMALL HEADING ERROR
+                            # Keep moving and make gentle corrections.
+                            # Close to waypoint, ignore tiny angular corrections.
+                            # ==========================================================
+                            fl.Rule.create("if angleError is NNear and distanceError is PNear then linearVelocity is MediumForward and angularVelocity is Zero"),
+                            fl.Rule.create("if angleError is NNear and distanceError is PFar then linearVelocity is Forward and angularVelocity is VSlowRight"),
+                            fl.Rule.create("if angleError is NNear and distanceError is PVeryFar then linearVelocity is FastForward and angularVelocity is VSlowRight"),
 
-    fl.Rule.create("if angleError is PNear and distanceError is PNear then linearVelocity is MediumForward and angularVelocity is Zero"),
-    fl.Rule.create("if angleError is PNear and distanceError is PFar then linearVelocity is Forward and angularVelocity is VSlowLeft"),
-    fl.Rule.create("if angleError is PNear and distanceError is PVeryFar then linearVelocity is FastForward and angularVelocity is VSlowLeft"),
+                            fl.Rule.create("if angleError is PNear and distanceError is PNear then linearVelocity is MediumForward and angularVelocity is Zero"),
+                            fl.Rule.create("if angleError is PNear and distanceError is PFar then linearVelocity is Forward and angularVelocity is VSlowLeft"),
+                            fl.Rule.create("if angleError is PNear and distanceError is PVeryFar then linearVelocity is FastForward and angularVelocity is VSlowLeft"),
 
-    # ==========================================================
-    # ALIGNED
-    # ==========================================================
-    fl.Rule.create("if angleError is Zero and distanceError is PNear then linearVelocity is MediumForward and angularVelocity is Zero"),
-    fl.Rule.create("if angleError is Zero and distanceError is PFar then linearVelocity is Forward and angularVelocity is Zero"),
-    fl.Rule.create("if angleError is Zero and distanceError is PVeryFar then linearVelocity is FastForward and angularVelocity is Zero"),
-],
+                            # ==========================================================
+                            # ALIGNED
+                            # ==========================================================
+                            fl.Rule.create("if angleError is Zero and distanceError is PNear then linearVelocity is MediumForward and angularVelocity is Zero"),
+                            fl.Rule.create("if angleError is Zero and distanceError is PFar then linearVelocity is Forward and angularVelocity is Zero"),
+                            fl.Rule.create("if angleError is Zero and distanceError is PVeryFar then linearVelocity is FastForward and angularVelocity is Zero"),
+                        ],
                 )
             ],
         )
@@ -194,32 +191,32 @@ class FuzzyController:
         distanceError.value = distance_error
         angleError.value = angle_error
         
-        print("================ DISTANCE MF ================")
+        # print("================ DISTANCE MF ================")
         
-        for term in distanceError.terms:
-            degree = term.membership(distance_error)
-            print(" {:12s} -> {:.4f}".format(term.name, float(degree)))
+        # for term in distanceError.terms:
+        #     degree = term.membership(distance_error)
+        #     print(" {:12s} -> {:.4f}".format(term.name, float(degree)))
         
-        print("================ ANGLE MF ================")
-        for term in angleError.terms:
-            degree = term.membership(angle_error)
-            print(" {:12s} -> {:.4f}".format(term.name, float(degree)))
+        # print("================ ANGLE MF ================")
+        # for term in angleError.terms:
+        #     degree = term.membership(angle_error)
+        #     print(" {:12s} -> {:.4f}".format(term.name, float(degree)))
             
         self.engine.process()
         
-        print(f"Fuzzy distance error: {distanceError.value}")
-        print(f"Fuzzy angle error: {angleError.value}")
+        # print(f"Fuzzy distance error: {distanceError.value}")
+        # print(f"Fuzzy angle error: {angleError.value}")
         
-        print("================ RULE BLOCK ================")
-        rule_block = self.engine.rule_block("mamdani").rules
-        for i, rule in enumerate(rule_block):
-            print(" R{:02d}: activation={} triggered={}".format(i, rule.activation_degree, rule.triggered))
+        # print("================ RULE BLOCK ================")
+        # rule_block = self.engine.rule_block("mamdani").rules
+        # for i, rule in enumerate(rule_block):
+        #     print(" R{:02d}: activation={} triggered={}".format(i, rule.activation_degree, rule.triggered))
         
         linVel = self.engine.output_variable("linearVelocity")
         angVel = self.engine.output_variable("angularVelocity")
         
-        print(f"Fuzzy Output Value Linear: {linVel.fuzzy_value()}")
-        print(f"Fuzzy Output Value Angular: {angVel.fuzzy_value()}")
+        # print(f"Fuzzy Output Value Linear: {linVel.fuzzy_value()}")
+        # print(f"Fuzzy Output Value Angular: {angVel.fuzzy_value()}")
         linear = float(linVel.value)
         angular = float(angVel.value)
 

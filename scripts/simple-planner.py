@@ -99,12 +99,7 @@ class SimplePlanner:
 
         # Fuzzy controllers live in their own modules.
         try:
-            self.controller = FuzzyController(
-                min_linear_speed=self.min_linear_velocity,
-                max_linear_speed=self.max_linear_velocity,
-                min_angular_speed=self.min_angular_velocity,
-                max_angular_speed=self.max_angular_velocity
-            )
+            self.controller = FuzzyController()
 
         except Exception as exc:
             raise rospy.ROSException(
