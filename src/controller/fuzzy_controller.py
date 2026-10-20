@@ -19,7 +19,7 @@ class FuzzyController:
         # Explicit physical output ranges.
         self.linear_min = min_linear_speed
         self.linear_max = max_linear_speed
-        self.angular_min = min_angular_speed
+        self.angular_min = -max_angular_speed
         self.angular_max = max_angular_speed
 
         self.engine = fl.Engine(
@@ -109,26 +109,21 @@ class FuzzyController:
                     implication=fl.AlgebraicProduct(),
                     activation=fl.General(),
                     rules=[
-                        # Close to the waypoint -> progressively reduce both commands.
                         fl.Rule.create("if distanceError is Zero then linearVelocity is Zero and angularVelocity is Zero"),
-
-                        # Large heading errors -> rotate in place.
-                        fl.Rule.create("if angleError is NVeryFar then linearVelocity is Zero and angularVelocity is FastRight"),
-                        fl.Rule.create("if angleError is NFar then linearVelocity is Zero and angularVelocity is SlowRight"),
-                        fl.Rule.create("if angleError is PFar then linearVelocity is Zero and angularVelocity is SlowLeft"),
-                        fl.Rule.create("if angleError is PVeryFar then linearVelocity is Zero and angularVelocity is FastLeft"),
-
-                        # Small negative heading error -> move and correct right.
-                        fl.Rule.create("if angleError is NNear and distanceError is PNear then linearVelocity is MediumForward and angularVelocity is VSlowRight"),
+                        fl.Rule.create("if angleError is NVeryFar then linearVelocity is Zero and angularVelocity is SlowRight"),
+                        fl.Rule.create("if angleError is PVeryFar then linearVelocity is Zero and angularVelocity is SlowLeft"),
+                        fl.Rule.create("if angleError is NFar and distanceError is PNear then linearVelocity is Zero and angularVelocity is VSlowRight"),
+                        fl.Rule.create("if angleError is NFar and distanceError is PFar then linearVelocity is MediumForward and angularVelocity is VSlowRight"),
+                        fl.Rule.create("if angleError is NFar and distanceError is PVeryFar then linearVelocity is MediumForward and angularVelocity is VSlowRight"),
+                        fl.Rule.create("if angleError is PFar and distanceError is PNear then linearVelocity is Zero and angularVelocity is VSlowLeft"),
+                        fl.Rule.create("if angleError is PFar and distanceError is PFar then linearVelocity is MediumForward and angularVelocity is VSlowLeft"),
+                        fl.Rule.create("if angleError is PFar and distanceError is PVeryFar then linearVelocity is MediumForward and angularVelocity is VSlowLeft"),
+                        fl.Rule.create("if angleError is NNear and distanceError is PNear then linearVelocity is MediumForward and angularVelocity is Zero"),
                         fl.Rule.create("if angleError is NNear and distanceError is PFar then linearVelocity is Forward and angularVelocity is VSlowRight"),
                         fl.Rule.create("if angleError is NNear and distanceError is PVeryFar then linearVelocity is FastForward and angularVelocity is VSlowRight"),
-
-                        # Small positive heading error -> move and correct left.
-                        fl.Rule.create("if angleError is PNear and distanceError is PNear then linearVelocity is MediumForward and angularVelocity is VSlowLeft"),
+                        fl.Rule.create("if angleError is PNear and distanceError is PNear then linearVelocity is MediumForward and angularVelocity is Zero"),
                         fl.Rule.create("if angleError is PNear and distanceError is PFar then linearVelocity is Forward and angularVelocity is VSlowLeft"),
                         fl.Rule.create("if angleError is PNear and distanceError is PVeryFar then linearVelocity is FastForward and angularVelocity is VSlowLeft"),
-
-                        # Correct heading -> advance straight.
                         fl.Rule.create("if angleError is Zero and distanceError is PNear then linearVelocity is MediumForward and angularVelocity is Zero"),
                         fl.Rule.create("if angleError is Zero and distanceError is PFar then linearVelocity is Forward and angularVelocity is Zero"),
                         fl.Rule.create("if angleError is Zero and distanceError is PVeryFar then linearVelocity is FastForward and angularVelocity is Zero"),
