@@ -22,14 +22,12 @@
 
     <!-- Waypoint tolerance + 3 deg / 7 deg angular hysteresis -->
     <param name="d_tolerance" value="0.05"/>
-    <param name="theta_enter" value="0.0523598776"/>
-    <param name="theta_exit" value="0.1221730476"/>
 
     <!-- Only physical limits remain here. Fuzzy rules live in their classes. -->
-    <param name="max_linear_velocity" value="0.25"/>
-    <param name="max_angular_velocity" value="0.45"/>
-    <param name="linear_acceleration" value="0.12"/>
-    <param name="angular_acceleration" value="0.60"/>
+    <param name="min_linear_velocity" value="0.25"/>
+    <param name="max_linear_velocity" value="0.65"/>
+    <param name="min_angular_velocity" value="0.80"/>
+    <param name="max_angular_velocity" value="1.00"/>
 
     <param name="control_hz" value="20.0"/>
     <param name="pose_timeout" value="0.50"/>
