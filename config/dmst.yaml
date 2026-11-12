@@ -1,0 +1,20 @@
+waypoints:
+  - {name: "M01_P4",  x: 0.50, y: 0.50, checkpoint: true}
+  - {name: "M02",     x: 3.00, y: 0.50, checkpoint: false}
+  - {name: "M03",     x: 3.00, y: 2.60, checkpoint: false}
+  - {name: "M04",     x: 1.00, y: 2.60, checkpoint: false}
+  - {name: "M05",     x: 1.00, y: 4.40, checkpoint: false}
+  - {name: "M06",     x: 5.10, y: 4.40, checkpoint: false}
+  - {name: "M07",     x: 5.10, y: 1.00, checkpoint: false}
+  - {name: "M08_P1",  x: 3.50, y: 0.00, checkpoint: true}
+  - {name: "M09",     x: 1.00, y: 3.90, checkpoint: false}
+  - {name: "M10",     x: 4.80, y: 3.90, checkpoint: false}
+  - {name: "M11",     x: 4.80, y: 1.20, checkpoint: false}
+  - {name: "M12",     x: 2.20, y: 1.20, checkpoint: false}
+  - {name: "M13",     x: 4.80, y: 1.20, checkpoint: false}
+  - {name: "M14_P4",  x: 0.50, y: 0.50, checkpoint: true}
+  - {name: "M15",     x: 1.00, y: 4.40, checkpoint: false}
+  - {name: "M16",     x: 5.00, y: 2.50, checkpoint: false}
+  - {name: "M17_P1",  x: 3.50, y: 0.00, checkpoint: true}
+  - {name: "M18_P4",  x: 0.50, y: 0.50, checkpoint: true}
+  - {name: "M19_END", x: 0.00, y: 0.00, checkpoint: false}
