@@ -35,14 +35,9 @@ class FuzzyController:
                     lock_range=True,
                     terms=[
                         fl.Trapezoid("Zero", 0.000, 0.000, 0.030, 0.050),
-                        fl.Triangle("PNear", 0.030, 0.150, 0.450),
-                        fl.Triangle("PFar", 0.150, 0.450, 0.750),
-                        fl.Trapezoid(
-                            "PVeryFar",
-                            0.450,
-                            0.750,
-                            self.distance_max,
-                            self.distance_max,
+                        fl.Triangle("PNear", 0.030, 0.450, 0.900),
+                        fl.Triangle("PFar", 0.450, 0.900, 1.350),
+                        fl.Trapezoid("PVeryFar", 0.900, 1.350, self.distance_max, self.distance_max,
                         ),
                     ],
                 ),
@@ -180,7 +175,7 @@ class FuzzyController:
         self.last_angle_error = angle_error
         self.last_desired_heading = desired_heading
         
-        print(f"distance_error: {distance_error}, heading_error: {angle_error}")
+        #print(f"distance_error: {distance_error}, heading_error: {angle_error}")
 
         # At the waypoint, heading is irrelevant: stop completely.
         if distance_error <= self.goal_tolerance:

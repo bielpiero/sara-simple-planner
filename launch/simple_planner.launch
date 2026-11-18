@@ -1,7 +1,7 @@
 <launch>
 
   <!-- Select: rectangle | figure8 -->
-  <arg name="trajectory" default="rectangle"/>
+  <arg name="trajectory" default="figure8"/>
 
   <!-- Fixed estimator used only as trajectory-controller feedback -->
   <arg name="pose_topic" default="/pose/filtered/ukf/incremental"/>
