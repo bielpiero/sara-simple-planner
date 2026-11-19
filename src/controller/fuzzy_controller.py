@@ -72,10 +72,10 @@ class FuzzyController:
                     default_value=0.0,
                     lock_previous=False,
                     terms=[
-                        fl.Triangle("Zero", 0.000, 0.000, 0.30),
-                        fl.Triangle("MediumForward", 0.220, 0.300, 0.380),
-                        fl.Triangle("Forward", 0.320, 0.450, 0.500),
-                        fl.Trapezoid("FastForward", 0.50, 0.60, 0.650, 0.650),
+                        fl.Triangle("Zero", 0.000, 0.000, 0.200),
+                        fl.Triangle("MediumForward", 0.150, 0.250, 0.350),
+                        fl.Triangle("Forward", 0.250, 0.350, 0.450),
+                        fl.Trapezoid("FastForward", 0.350, 0.450, 0.550, 0.550),
                     ],
                 ),
                 fl.OutputVariable(
