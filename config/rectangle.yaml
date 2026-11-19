@@ -2,4 +2,4 @@ waypoints:
   - {name: "P1", x: 3.40, y: 0.00, checkpoint: true}
   - {name: "P2", x: 3.40, y: 3.40, checkpoint: true}
   - {name: "P3", x: 0.40, y: 3.40, checkpoint: true}
-  - {name: "P4", x: 0.40, y: 0.40, checkpoint: true}
+  - {name: "P4", x: 0.40, y: 0.00, checkpoint: true}

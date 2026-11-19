@@ -1,10 +1,10 @@
 <launch>
 
   <!-- Select: rectangle | figure8 -->
-  <arg name="trajectory" default="rectangle"/>
+  <arg name="trajectory" default="dmst"/>
 
   <!-- Fixed estimator used only as trajectory-controller feedback -->
-  <arg name="pose_topic" default="/pose/filtered/ukf/incremental"/>
+  <arg name="pose_topic" default="/pose/filtered/ekf/incremental"/>
   <arg name="cmd_vel_topic" default="/cmd_vel"/>
   <arg name="run_id" default="1"/>
 
